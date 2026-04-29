@@ -59,24 +59,7 @@
             </button>
         </form>
 
-        <div class="login-hint">
-            <p class="hint-title">Credenciales de demo:</p>
-            <div class="hint-grid">
-                <div class="hint-item">
-                    <span class="hint-label">Admin</span>
-                    <span class="hint-value">admin@empresa.com</span>
-                </div>
-                <div class="hint-item">
-                    <span class="hint-label">Empleado</span>
-                    <span class="hint-value">pedro@empresa.com</span>
-                </div>
-                <div class="hint-item">
-                    <span class="hint-label">Jefe Dto.</span>
-                    <span class="hint-value">carlos@empresa.com</span>
-                </div>
-            </div>
-            <p class="hint-pass">Contraseña: <code>password</code></p>
-        </div>
+        
     </div>
 </div>
 
