@@ -1,129 +1,113 @@
 <?php
-$page_title = 'Panel de Administración';
-require_once __DIR__ . '/../shared/header.php';
-
-$depto_labels = [
-    'rrhh'         => 'RRHH',
-    'direccion'    => 'Dirección',
-    'contabilidad' => 'Contabilidad',
-    'desarrollo'   => 'Desarrollo',
-    'diseno'       => 'Diseño',
-];
+$pageTitle = 'Panel Administración';
+$action = 'dashboard';
+include __DIR__ . '/../shared/header.php';
 ?>
 
-<div class="admin-dashboard">
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Panel de Administración</h1>
+        <p class="page-subtitle">Gestión completa del sistema TimeControl</p>
+    </div>
+</div>
 
-    <!-- KPIs -->
-    <div class="kpi-row">
-        <div class="kpi-card">
-            <div class="kpi-icon">◎</div>
-            <div class="kpi-num"><?= $stats['total_empleados'] ?></div>
-            <div class="kpi-label">Empleados activos</div>
+<div class="stats-grid">
+    <div class="stat-card stat-card-blue">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value"><?= $totalUsuarios ?></div>
+        <div class="stat-label">Usuarios activos</div>
+    </div>
+    <div class="stat-card stat-card-green">
+        <div class="stat-icon">🗂️</div>
+        <div class="stat-value"><?= $totalProyectos ?></div>
+        <div class="stat-label">Proyectos activos</div>
+    </div>
+    <div class="stat-card stat-card-orange">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-value"><?= $incidenciasPend ?></div>
+        <div class="stat-label">Incidencias pendientes</div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- Gestión rápida -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Gestión de Usuarios</h3>
         </div>
-        <div class="kpi-card">
-            <div class="kpi-icon">◆</div>
-            <div class="kpi-num"><?= $stats['proyectos_activos'] ?></div>
-            <div class="kpi-label">Proyectos activos</div>
-        </div>
-        <div class="kpi-card kpi-alerta">
-            <div class="kpi-icon">⚠</div>
-            <div class="kpi-num"><?= $stats['incidencias_pendientes'] ?></div>
-            <div class="kpi-label">Incidencias pendientes</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-icon">◷</div>
-            <div class="kpi-num"><?= $stats['fichajes_hoy'] ?></div>
-            <div class="kpi-label">Fichajes hoy</div>
+        <div class="card-body">
+            <div class="quick-links">
+                <a href="?action=admin_nuevo_usuario" class="quick-link-btn quick-link-primary">+ Nuevo usuario</a>
+                <a href="?action=admin_usuarios" class="quick-link-btn">Ver todos los usuarios</a>
+                <a href="?action=admin_horarios" class="quick-link-btn">Gestionar horarios</a>
+            </div>
         </div>
     </div>
 
-    <!-- Accesos rápidos de admin -->
-    <div class="admin-shortcuts">
-        <a href="<?= APP_URL ?>/index.php?action=usuarios" class="shortcut-card">
-            <span class="shortcut-icon">◎</span>
-            <span class="shortcut-label">Gestionar usuarios</span>
-            <span class="shortcut-arrow">→</span>
-        </a>
-        <a href="<?= APP_URL ?>/index.php?action=proyectos" class="shortcut-card">
-            <span class="shortcut-icon">◆</span>
-            <span class="shortcut-label">Gestionar proyectos</span>
-            <span class="shortcut-arrow">→</span>
-        </a>
-        <a href="<?= APP_URL ?>/index.php?action=horarios" class="shortcut-card">
-            <span class="shortcut-icon">◐</span>
-            <span class="shortcut-label">Definir horarios</span>
-            <span class="shortcut-arrow">→</span>
-        </a>
-        <a href="<?= APP_URL ?>/index.php?action=informes" class="shortcut-card">
-            <span class="shortcut-icon">◈</span>
-            <span class="shortcut-label">Ver informes</span>
-            <span class="shortcut-arrow">→</span>
-        </a>
-        <a href="<?= APP_URL ?>/index.php?action=incidencias" class="shortcut-card">
-            <span class="shortcut-icon">⚠</span>
-            <span class="shortcut-label">Incidencias</span>
-            <span class="shortcut-arrow">→</span>
-        </a>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Gestión de Proyectos</h3>
+        </div>
+        <div class="card-body">
+            <div class="quick-links">
+                <a href="?action=admin_proyectos" class="quick-link-btn quick-link-primary">Ver proyectos</a>
+                <a href="?action=admin_asignar_proyecto" class="quick-link-btn">Asignar empleados</a>
+                <a href="?action=informes" class="quick-link-btn">Ver informes</a>
+                <a href="?action=manager_incidencias" class="quick-link-btn">Gestionar incidencias</a>
+            </div>
+        </div>
     </div>
 
-    <div class="admin-grid">
-
-        <!-- Incidencias recientes -->
-        <section class="card">
-            <div class="card-header">
-                <span class="card-icon">⚠</span>
-                <h2 class="card-title">Incidencias pendientes</h2>
-                <a href="<?= APP_URL ?>/index.php?action=incidencias" class="card-action">Ver todas →</a>
-            </div>
-            <div class="card-body no-pad">
-                <?php if (empty($incidencias_recientes)): ?>
-                <div class="empty-state"><p>✓ Sin incidencias pendientes</p></div>
-                <?php else: ?>
-                <table class="data-table">
-                    <thead><tr><th>Empleado</th><th>Dpto.</th><th>Tipo</th><th>Fecha</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($incidencias_recientes as $inc): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($inc['nombre'] . ' ' . $inc['apellidos']) ?></td>
-                        <td><span class="depto-chip depto-<?= $inc['departamento'] ?>"><?= $depto_labels[$inc['departamento']] ?? ucfirst($inc['departamento']) ?></span></td>
-                        <td><span class="badge badge-warning"><?= str_replace('_', ' ', ucfirst($inc['tipo'])) ?></span></td>
-                        <td><?= date('d/m', strtotime($inc['fecha'])) ?></td>
-                    </tr>
+    <!-- Lista de usuarios -->
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3 class="card-title">Usuarios del sistema</h3>
+            <a href="?action=admin_usuarios" class="card-link">Gestionar →</a>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Departamento</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach (array_slice($empleados, 0, 10) as $emp): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($emp['nombre'] . ' ' . $emp['apellidos']) ?></td>
+                            <td class="text-muted small"><?= htmlspecialchars($emp['email']) ?></td>
+                            <td><span class="badge badge-rol-<?= $emp['rol'] ?>"><?= str_replace('_', ' ', $emp['rol']) ?></span></td>
+                            <td class="text-muted small"><?= htmlspecialchars($emp['departamento_nombre'] ?? '—') ?></td>
+                            <td><span class="badge <?= $emp['activo'] ? 'badge-ok' : 'badge-error' ?>"><?= $emp['activo'] ? 'Activo' : 'Inactivo' ?></span></td>
+                        </tr>
                     <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <?php endif; ?>
-            </div>
-        </section>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-        <!-- Sin fichar hoy -->
-        <section class="card">
-            <div class="card-header">
-                <span class="card-icon">○</span>
-                <h2 class="card-title">Sin fichar hoy (<?= count($sin_fichar_hoy) ?>)</h2>
-            </div>
-            <div class="card-body no-pad">
-                <?php if (empty($sin_fichar_hoy)): ?>
-                <div class="empty-state"><p>✓ Todos han fichado hoy</p></div>
-                <?php else: ?>
-                <table class="data-table">
-                    <thead><tr><th>Empleado</th><th>Departamento</th><th>Hora entrada</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($sin_fichar_hoy as $u): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($u['nombre'] . ' ' . $u['apellidos']) ?></td>
-                        <td><span class="depto-chip depto-<?= $u['departamento'] ?>"><?= $depto_labels[$u['departamento']] ?? ucfirst($u['departamento']) ?></span></td>
-                        <td><?= substr($u['hora_inicio'], 0, 5) ?></td>
-                    </tr>
+    <!-- Proyectos -->
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3 class="card-title">Proyectos</h3>
+            <a href="?action=admin_proyectos" class="card-link">Gestionar →</a>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr><th>Proyecto</th><th>Estado</th><th>Responsable</th><th>Inicio</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($proyectos as $p): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($p['nombre']) ?></td>
+                            <td><span class="badge badge-estado-<?= $p['estado'] ?>"><?= ucfirst($p['estado']) ?></span></td>
+                            <td class="text-muted small"><?= htmlspecialchars($p['responsable_nombre'] ?? '—') ?></td>
+                            <td class="text-muted small"><?= $p['fecha_inicio'] ? date('d/m/Y', strtotime($p['fecha_inicio'])) : '—' ?></td>
+                        </tr>
                     <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <?php endif; ?>
-            </div>
-        </section>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
-    </div><!-- /admin-grid -->
-
-</div><!-- /admin-dashboard -->
-
-<?php require_once __DIR__ . '/../shared/footer.php'; ?>
+<?php include __DIR__ . '/../shared/footer.php'; ?>

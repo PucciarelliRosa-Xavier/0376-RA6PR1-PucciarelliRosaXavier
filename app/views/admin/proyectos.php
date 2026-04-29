@@ -1,98 +1,140 @@
 <?php
-$page_title = 'Gestión de Proyectos';
-$extra_js   = 'proyectos';
-require_once __DIR__ . '/../shared/header.php';
-
-$estado_labels = ['activo' => 'Activo', 'pausado' => 'Pausado', 'completado' => 'Completado'];
+$pageTitle = 'Proyectos';
+$action = 'admin_proyectos';
+include __DIR__ . '/../shared/header.php';
 ?>
 
-<div class="admin-section">
-    <div class="toolbar">
-        <h2>Proyectos (<?= count($proyectos) ?>)</h2>
-        <button class="btn btn-primary" id="btnNuevoProyecto">+ Nuevo proyecto</button>
-    </div>
-
-    <div class="proyectos-grid">
-        <?php foreach ($proyectos as $p): ?>
-        <div class="proyecto-card" style="--project-color:<?= htmlspecialchars($p['color']) ?>">
-            <div class="proyecto-card-header">
-                <div class="proyecto-color-bar"></div>
-                <div class="proyecto-card-actions">
-                    <button class="btn-icon" onclick='editarProyecto(<?= json_encode($p) ?>)' title="Editar">✎</button>
-                    <button class="btn-icon btn-icon--danger" onclick="archivarProyecto(<?= $p['id'] ?>)" title="Archivar">✕</button>
-                </div>
-            </div>
-            <div class="proyecto-card-body">
-                <h3 class="proyecto-card-nombre"><?= htmlspecialchars($p['nombre']) ?></h3>
-                <p class="proyecto-card-desc"><?= htmlspecialchars($p['descripcion'] ?? '') ?></p>
-                <div class="proyecto-card-stats">
-                    <span>👥 <?= $p['num_empleados'] ?> empleados</span>
-                    <span>⏱ <?= number_format($p['horas_totales'], 0) ?>h totales</span>
-                </div>
-            </div>
-            <div class="proyecto-card-footer">
-                <span class="badge badge-estado badge-<?= $p['estado'] ?>"><?= $estado_labels[$p['estado']] ?></span>
-                <?php if ($p['fecha_inicio']): ?>
-                <span class="text-muted"><?= date('d/m/Y', strtotime($p['fecha_inicio'])) ?></span>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php endforeach; ?>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Gestión de Proyectos</h1>
+        <p class="page-subtitle">Crear, editar y asignar empleados a proyectos</p>
     </div>
 </div>
 
-<!-- Modal proyecto -->
-<div class="modal-overlay hidden" id="modalProyecto">
-    <div class="modal">
-        <div class="modal-header">
-            <h3 id="modalProyectoTitle">Nuevo proyecto</h3>
-            <button class="modal-close" id="closeModalProyecto">✕</button>
+<?php if ($mensaje): ?>
+    <div class="alert alert-ok"><span class="alert-icon">✓</span><?= htmlspecialchars($mensaje) ?></div>
+<?php endif; ?>
+
+<div class="dashboard-grid">
+    <!-- Formulario nuevo proyecto -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Nuevo / Editar Proyecto</h3>
         </div>
-        <div class="modal-body">
-            <form id="proyectoForm">
-                <input type="hidden" id="pid" name="id" value="0">
+        <div class="card-body">
+            <form action="?action=admin_guardar_proyecto" method="POST" class="form-vertical" id="form-proyecto">
+                <input type="hidden" name="id" id="proy-id" value="">
                 <div class="form-group">
-                    <label class="form-label">Nombre del proyecto <span class="required">*</span></label>
-                    <input type="text" id="pNombre" name="nombre" class="form-input" required>
+                    <label class="form-label">Nombre *</label>
+                    <input type="text" name="nombre" id="proy-nombre" class="form-input" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Descripción</label>
-                    <textarea id="pDesc" name="descripcion" class="form-input form-textarea" rows="2"></textarea>
+                    <textarea name="descripcion" id="proy-desc" class="form-input form-textarea" rows="3"></textarea>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Estado</label>
-                        <select id="pEstado" name="estado" class="form-input">
+                        <select name="estado" id="proy-estado" class="form-input">
                             <option value="activo">Activo</option>
                             <option value="pausado">Pausado</option>
                             <option value="completado">Completado</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Color</label>
-                        <input type="color" id="pColor" name="color" class="form-input form-input--color" value="#4F6EF7">
+                        <label class="form-label">Responsable</label>
+                        <select name="id_responsable" class="form-input">
+                            <option value="">Sin responsable</option>
+                            <?php foreach ($usuarios as $u): ?>
+                                <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['nombre'] . ' ' . $u['apellidos']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Fecha inicio</label>
-                        <input type="date" id="pFechaInicio" name="fecha_inicio" class="form-input">
+                        <input type="date" name="fecha_inicio" class="form-input">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Fecha fin prevista</label>
-                        <input type="date" id="pFechaFin" name="fecha_fin" class="form-input">
+                        <label class="form-label">Fecha fin</label>
+                        <input type="date" name="fecha_fin" class="form-input">
                     </div>
                 </div>
-                <div class="modal-actions">
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalProyecto').classList.add('hidden')">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar proyecto</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de proyectos -->
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3 class="card-title">Proyectos existentes</h3>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr><th>Nombre</th><th>Estado</th><th>Responsable</th><th>Inicio</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($proyectos as $p): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($p['nombre']) ?></td>
+                            <td><span class="badge badge-estado-<?= $p['estado'] ?>"><?= ucfirst($p['estado']) ?></span></td>
+                            <td class="text-muted small"><?= htmlspecialchars($p['responsable_nombre'] ?? '—') ?></td>
+                            <td class="text-muted small"><?= $p['fecha_inicio'] ? date('d/m/Y', strtotime($p['fecha_inicio'])) : '—' ?></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline"
+                                    onclick="editarProy(<?= htmlspecialchars(json_encode($p)) ?>)">
+                                    Editar
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Asignar empleado a proyecto -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Asignar Empleado a Proyecto</h3>
+        </div>
+        <div class="card-body">
+            <form action="?action=admin_asignar_proyecto" method="POST" class="form-vertical">
+                <div class="form-group">
+                    <label class="form-label">Proyecto</label>
+                    <select name="id_proyecto" class="form-input" required>
+                        <option value="">Selecciona...</option>
+                        <?php foreach ($proyectos as $p): if ($p['estado'] !== 'activo') continue; ?>
+                            <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nombre']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Empleado</label>
+                    <select name="id_usuario" class="form-input" required>
+                        <option value="">Selecciona...</option>
+                        <?php foreach ($usuarios as $u): ?>
+                            <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['nombre'] . ' ' . $u['apellidos']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Asignar</button>
             </form>
         </div>
     </div>
 </div>
 
-<?php
-$inline_js = "const APP_URL = '" . APP_URL . "';";
-require_once __DIR__ . '/../shared/footer.php';
-?>
+<script>
+function editarProy(p) {
+    document.getElementById('proy-id').value = p.id;
+    document.getElementById('proy-nombre').value = p.nombre;
+    document.getElementById('proy-desc').value = p.descripcion || '';
+    document.getElementById('proy-estado').value = p.estado;
+    document.getElementById('form-proyecto').scrollIntoView({behavior:'smooth'});
+}
+</script>
+
+<?php include __DIR__ . '/../shared/footer.php'; ?>

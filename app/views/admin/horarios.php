@@ -1,86 +1,92 @@
 <?php
-$page_title = 'Gestión de Horarios';
-$extra_js   = 'horarios';
-require_once __DIR__ . '/../shared/header.php';
+$pageTitle = 'Horarios';
+$action = 'admin_horarios';
+include __DIR__ . '/../shared/header.php';
 ?>
 
-<div class="admin-section">
-    <div class="toolbar">
-        <h2>Horarios definidos</h2>
-        <button class="btn btn-primary" id="btnNuevoHorario">+ Nuevo horario</button>
-    </div>
-
-    <div class="horarios-grid">
-        <?php foreach ($horarios as $h): ?>
-        <div class="horario-card">
-            <div class="horario-card-header">
-                <div class="horario-icon">◷</div>
-                <div class="horario-card-actions">
-                    <button class="btn-icon" onclick='editarHorario(<?= json_encode($h) ?>)' title="Editar">✎</button>
-                </div>
-            </div>
-            <div class="horario-card-body">
-                <h3><?= htmlspecialchars($h['nombre']) ?></h3>
-                <div class="horario-times">
-                    <div class="horario-time">
-                        <span class="time-label">Entrada</span>
-                        <span class="time-val"><?= substr($h['hora_inicio'], 0, 5) ?></span>
-                    </div>
-                    <div class="horario-arrow">→</div>
-                    <div class="horario-time">
-                        <span class="time-label">Salida</span>
-                        <span class="time-val"><?= substr($h['hora_fin'], 0, 5) ?></span>
-                    </div>
-                </div>
-                <p class="tolerancia-info">Tolerancia: <?= $h['tolerancia'] ?> min</p>
-            </div>
-            <div class="horario-card-footer">
-                <span><?= $h['num_usuarios'] ?> empleados asignados</span>
-            </div>
-        </div>
-        <?php endforeach; ?>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Gestión de Horarios</h1>
+        <p class="page-subtitle">Define los horarios laborales y asígnalos a empleados</p>
     </div>
 </div>
 
-<!-- Modal horario -->
-<div class="modal-overlay hidden" id="modalHorario">
-    <div class="modal modal--sm">
-        <div class="modal-header">
-            <h3 id="modalHorarioTitle">Nuevo horario</h3>
-            <button class="modal-close" id="closeModalHorario">✕</button>
+<?php if ($mensaje): ?>
+    <div class="alert alert-ok"><span class="alert-icon">✓</span><?= htmlspecialchars($mensaje) ?></div>
+<?php endif; ?>
+
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Nuevo / Editar Horario</h3>
         </div>
-        <div class="modal-body">
-            <form id="horarioForm">
-                <input type="hidden" id="hid" name="id" value="0">
+        <div class="card-body">
+            <form action="?action=admin_guardar_horario" method="POST" class="form-vertical" id="form-horario">
+                <input type="hidden" name="id" id="hor-id" value="">
                 <div class="form-group">
-                    <label class="form-label">Nombre <span class="required">*</span></label>
-                    <input type="text" id="hNombre" name="nombre" class="form-input" placeholder="Ej: Jornada Completa 9-18" required>
+                    <label class="form-label">Nombre del horario *</label>
+                    <input type="text" name="nombre" id="hor-nombre" class="form-input"
+                        placeholder="ej: Jornada Completa Mañana" required>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Hora entrada <span class="required">*</span></label>
-                        <input type="time" id="hInicio" name="hora_inicio" class="form-input" required>
+                        <label class="form-label">Hora de entrada *</label>
+                        <input type="time" name="hora_entrada" id="hor-entrada" class="form-input" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Hora salida <span class="required">*</span></label>
-                        <input type="time" id="hFin" name="hora_fin" class="form-input" required>
+                        <label class="form-label">Hora de salida *</label>
+                        <input type="time" name="hora_salida" id="hor-salida" class="form-input" required>
                     </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Tolerancia (minutos)</label>
-                    <input type="number" id="hTolerancia" name="tolerancia" class="form-input" value="10" min="0" max="60">
-                    <span class="form-hint">Minutos de margen antes de registrar retraso</span>
+                    <input type="number" name="tolerancia_minutos" id="hor-tol" class="form-input" value="15" min="0" max="60">
+                    <span class="form-hint">Margen antes de marcar una tardanza</span>
                 </div>
-                <div class="modal-actions">
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalHorario').classList.add('hidden')">Cancelar</button>
-                </div>
+                <button type="submit" class="btn btn-primary">Guardar horario</button>
             </form>
+        </div>
+    </div>
+
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3 class="card-title">Horarios configurados</h3>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr><th>Nombre</th><th>Entrada</th><th>Salida</th><th>Tolerancia</th><th>Acción</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($horarios as $h): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($h['nombre']) ?></td>
+                            <td class="mono"><?= substr($h['hora_entrada'], 0, 5) ?></td>
+                            <td class="mono"><?= substr($h['hora_salida'], 0, 5) ?></td>
+                            <td><?= $h['tolerancia_minutos'] ?> min</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline"
+                                    onclick="editarHorario(<?= htmlspecialchars(json_encode($h)) ?>)">
+                                    Editar
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<?php
-$inline_js = "const APP_URL = '" . APP_URL . "';";
-require_once __DIR__ . '/../shared/footer.php';
-?>
+<script>
+function editarHorario(h) {
+    document.getElementById('hor-id').value = h.id;
+    document.getElementById('hor-nombre').value = h.nombre;
+    document.getElementById('hor-entrada').value = h.hora_entrada.substring(0,5);
+    document.getElementById('hor-salida').value = h.hora_salida.substring(0,5);
+    document.getElementById('hor-tol').value = h.tolerancia_minutos;
+    document.getElementById('form-horario').scrollIntoView({behavior:'smooth'});
+}
+</script>
+
+<?php include __DIR__ . '/../shared/footer.php'; ?>

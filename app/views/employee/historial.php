@@ -1,169 +1,149 @@
 <?php
-$page_title = 'Historial de Fichajes';
-require_once __DIR__ . '/../shared/header.php';
+$pageTitle = 'Mi Historial';
+$action = 'historial';
+include __DIR__ . '/../shared/header.php';
 ?>
 
-<div class="historial-container">
-
-    <!-- Filtro de mes -->
-    <div class="filter-bar">
-        <form method="GET" action="<?= APP_URL ?>/index.php" class="filter-form">
-            <input type="hidden" name="action" value="fichajes_historial">
-            <div class="form-group form-group--inline">
-                <label class="form-label">Mes</label>
-                <input type="month" name="mes" class="form-input" value="<?= htmlspecialchars($mes) ?>" onchange="this.form.submit()">
-            </div>
-        </form>
-        <div class="mes-total">
-            Total del mes: <strong><?= FichajeModel::formatearHoras($total_horas) ?></strong>
-        </div>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Historial de Fichajes</h1>
+        <p class="page-subtitle">Consulta todos tus registros de entrada y salida</p>
     </div>
+</div>
 
-    <!-- Resumen rápido -->
-    <div class="stats-row">
-        <div class="stat-card">
-            <div class="stat-num"><?= count($fichajes) ?></div>
-            <div class="stat-label">Días registrados</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-num"><?= FichajeModel::formatearHoras($total_horas) ?></div>
-            <div class="stat-label">Horas trabajadas</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-num"><?= count($incidencias) ?></div>
-            <div class="stat-label">Incidencias</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-num">
-                <?= $total_horas > 0 ? number_format($total_horas / max(count($fichajes), 1), 1) : 0 ?>h
+<!-- Filtros -->
+<div class="card filter-card">
+    <form method="GET" action="" class="filter-form">
+        <input type="hidden" name="action" value="historial">
+        <div class="filter-row">
+            <div class="form-group">
+                <label class="form-label">Desde</label>
+                <input type="date" name="desde" class="form-input" value="<?= htmlspecialchars($desde) ?>">
             </div>
-            <div class="stat-label">Media diaria</div>
+            <div class="form-group">
+                <label class="form-label">Hasta</label>
+                <input type="date" name="hasta" class="form-input" value="<?= htmlspecialchars($hasta) ?>">
+            </div>
+            <div class="form-group form-group-action">
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+            </div>
         </div>
-    </div>
+    </form>
+</div>
 
-    <!-- Tabla de fichajes -->
-    <div class="card">
+<!-- Resumen -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">📅</div>
+        <div class="stat-value"><?= count($resumenDiario) ?></div>
+        <div class="stat-label">Días trabajados</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value"><?= number_format($totalHoras, 1) ?>h</div>
+        <div class="stat-label">Total horas</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-value"><?= count(array_filter($resumenDiario, fn($r) => $r['hubo_tardanza'])) ?></div>
+        <div class="stat-label">Tardanzas</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">✓</div>
+        <div class="stat-value"><?= count(array_filter($resumenDiario, fn($r) => $r['horas_trabajadas'] !== null)) ?></div>
+        <div class="stat-label">Días completos</div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- Resumen diario -->
+    <div class="card card-wide">
         <div class="card-header">
-            <span class="card-icon">◷</span>
-            <h2 class="card-title">Detalle por día</h2>
+            <h3 class="card-title">Resumen por día</h3>
         </div>
-        <div class="card-body no-pad">
-            <?php if (empty($fichajes)): ?>
-            <div class="empty-state">
-                <p>No hay fichajes registrados en este período.</p>
-            </div>
+        <div class="card-body">
+            <?php if (empty($resumenDiario)): ?>
+                <p class="empty-state">No hay registros en el periodo seleccionado.</p>
             <?php else: ?>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Entrada</th>
-                        <th>Salida</th>
-                        <th>Horas</th>
-                        <th>Estado</th>
-                        <th>Incidencias</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($fichajes as $f):
-                    $tipos_arr = $f['tipos_arr'];
-                    $horas_arr = $f['horas_arr'];
-
-                    // Buscar primera entrada y última salida
-                    $primera_entrada = null;
-                    $ultima_salida   = null;
-                    for ($i = 0; $i < count($tipos_arr); $i++) {
-                        if ($tipos_arr[$i] === 'entrada' && !$primera_entrada) $primera_entrada = $horas_arr[$i];
-                        if ($tipos_arr[$i] === 'salida')                        $ultima_salida   = $horas_arr[$i];
-                    }
-
-                    // Incidencias del día
-                    $incs_dia = array_filter($incidencias, fn($i) => $i['fecha'] === $f['fecha']);
-                    $tiene_retraso  = count(array_filter($incs_dia, fn($i) => $i['tipo'] === 'retraso')) > 0;
-                    $tiene_olvido   = count(array_filter($incs_dia, fn($i) => str_contains($i['tipo'], 'olvido'))) > 0;
-
-                    $horas_ok = $f['horas_trabajadas'] >= 7;
-                    $row_class = ($tiene_retraso || $tiene_olvido) ? 'row-warning' : ($horas_ok ? '' : 'row-alert');
-                ?>
-                <tr class="<?= $row_class ?>">
-                    <td>
-                        <div class="fecha-cell">
-                            <span class="fecha-dia"><?= date('D', strtotime($f['fecha'])) ?></span>
-                            <span class="fecha-num"><?= date('d/m/Y', strtotime($f['fecha'])) ?></span>
-                        </div>
-                    </td>
-                    <td>
-                        <?php if ($primera_entrada): ?>
-                        <span class="time-badge time-badge--in"><?= substr($primera_entrada, 0, 5) ?></span>
-                        <?php else: ?>
-                        <span class="time-badge time-badge--missing">—</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($ultima_salida): ?>
-                        <span class="time-badge time-badge--out"><?= substr($ultima_salida, 0, 5) ?></span>
-                        <?php else: ?>
-                        <span class="time-badge time-badge--missing">—</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <strong><?= FichajeModel::formatearHoras($f['horas_trabajadas']) ?></strong>
-                    </td>
-                    <td>
-                        <?php if ($f['horas_trabajadas'] >= 7): ?>
-                        <span class="badge badge-success">✓ Completo</span>
-                        <?php elseif ($f['horas_trabajadas'] > 0): ?>
-                        <span class="badge badge-warning">◑ Parcial</span>
-                        <?php else: ?>
-                        <span class="badge badge-error">✗ Sin datos</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($tiene_retraso): ?>
-                        <span class="badge badge-warning">Retraso</span>
-                        <?php endif; ?>
-                        <?php if ($tiene_olvido): ?>
-                        <span class="badge badge-error">Olvido</span>
-                        <?php endif; ?>
-                        <?php if (!$tiene_retraso && !$tiene_olvido): ?>
-                        <span class="text-muted">—</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Primera Entrada</th>
+                            <th>Última Salida</th>
+                            <th>Horas</th>
+                            <th>Entradas</th>
+                            <th>Salidas</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($resumenDiario as $dia): ?>
+                            <tr class="<?= $dia['hubo_tardanza'] ? 'row-warn' : '' ?>">
+                                <td><?= date('D d/m/Y', strtotime($dia['fecha'])) ?></td>
+                                <td class="mono"><?= $dia['primera_entrada'] ? substr($dia['primera_entrada'], 11, 5) : '—' ?></td>
+                                <td class="mono"><?= $dia['ultima_salida'] ? substr($dia['ultima_salida'], 11, 5) : '—' ?></td>
+                                <td class="mono bold"><?= $dia['horas_trabajadas'] !== null ? number_format($dia['horas_trabajadas'], 1) . 'h' : '—' ?></td>
+                                <td class="center"><?= $dia['num_entradas'] ?></td>
+                                <td class="center"><?= $dia['num_salidas'] ?></td>
+                                <td>
+                                    <?php if ($dia['hubo_tardanza']): ?>
+                                        <span class="badge badge-warn">Tardanza</span>
+                                    <?php elseif ($dia['hubo_salida_anticipada']): ?>
+                                        <span class="badge badge-warn">Salida ant.</span>
+                                    <?php elseif ($dia['num_salidas'] === '0' || $dia['num_salidas'] == 0): ?>
+                                        <span class="badge badge-error">Sin salida</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-ok">Correcto</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             <?php endif; ?>
         </div>
     </div>
 
-    <!-- Incidencias del mes -->
-    <?php if (!empty($incidencias)): ?>
-    <div class="card mt-4">
+    <!-- Detalle de fichajes -->
+    <div class="card card-wide">
         <div class="card-header">
-            <span class="card-icon">⚠</span>
-            <h2 class="card-title">Incidencias del mes</h2>
+            <h3 class="card-title">Detalle de fichajes</h3>
         </div>
-        <div class="card-body no-pad">
-            <table class="data-table">
-                <thead>
-                    <tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Estado</th></tr>
-                </thead>
-                <tbody>
-                <?php foreach ($incidencias as $inc): ?>
-                <tr>
-                    <td><?= date('d/m/Y', strtotime($inc['fecha'])) ?></td>
-                    <td><span class="badge badge-<?= $inc['tipo'] === 'retraso' ? 'warning' : 'error' ?>"><?= str_replace('_', ' ', ucfirst($inc['tipo'])) ?></span></td>
-                    <td><?= htmlspecialchars($inc['descripcion']) ?></td>
-                    <td><span class="badge badge-<?= $inc['estado'] === 'resuelta' ? 'success' : 'info' ?>"><?= ucfirst($inc['estado']) ?></span></td>
-                </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
+        <div class="card-body">
+            <?php if (empty($fichajes)): ?>
+                <p class="empty-state">Sin fichajes en el periodo.</p>
+            <?php else: ?>
+                <table class="table">
+                    <thead>
+                        <tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Incidencia</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($fichajes as $f): ?>
+                            <tr>
+                                <td><?= date('d/m/Y', strtotime($f['timestamp'])) ?></td>
+                                <td class="mono"><?= substr($f['timestamp'], 11, 8) ?></td>
+                                <td>
+                                    <span class="badge <?= $f['tipo'] === 'entrada' ? 'badge-entrada' : 'badge-salida' ?>">
+                                        <?= ucfirst($f['tipo']) ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php if ($f['es_tardanza']): ?>
+                                        <span class="badge badge-warn">+<?= $f['minutos_diferencia'] ?>min</span>
+                                    <?php elseif ($f['es_salida_anticipada']): ?>
+                                        <span class="badge badge-warn">-<?= $f['minutos_diferencia'] ?>min ant.</span>
+                                    <?php else: ?>
+                                        <span class="text-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
         </div>
     </div>
-    <?php endif; ?>
-
 </div>
 
-<?php require_once __DIR__ . '/../shared/footer.php'; ?>
+<?php include __DIR__ . '/../shared/footer.php'; ?>

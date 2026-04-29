@@ -1,128 +1,71 @@
 #!/usr/bin/env php
 <?php
 /**
- * TimeControl - Cron Job: Detección de olvidos de fichaje
+ * TimeControl — Script CRON
+ * Detecta olvidos de fichaje y envía alertas por email
  *
  * Configurar en crontab:
- *   # Ejecutar cada día a las 23:00
- *   0 23 * * 1-5 /usr/bin/php /var/www/html/timecontrol/cron/detectar_olvidos.php >> /var/log/timecontrol_cron.log 2>&1
+ *   # Ejecutar cada mañana a las 09:15 para detectar olvidos del día anterior
+ *   15 9 * * 1-5 php /var/www/timecontrol/cron/detectar_olvidos.php
  *
- * También se puede lanzar a mediodía para detectar ausencias de mañana:
- *   0 10 * * 1-5 /usr/bin/php /var/www/html/timecontrol/cron/detectar_olvidos.php morning
+ *   # Ejecutar cada 5 minutos en horario laboral para tardanzas (opcional, el sistema las detecta en tiempo real)
+ *   */5 9-10 * * 1-5 php /var/www/timecontrol/cron/detectar_olvidos.php --tardanzas
  */
 
-// Bootstrap
-define('CRON_MODE', true);
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../config/Database.php';
-require_once __DIR__ . '/../app/helpers/EmailHelper.php';
+// Cargar configuración
+define('CLI_MODE', true);
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../app/models/Usuario.php';
+require_once __DIR__ . '/../app/models/Fichaje.php';
+require_once __DIR__ . '/../app/models/Incidencia.php';
+require_once __DIR__ . '/../mail/Mailer.php';
 
-$db   = Database::getInstance();
-$hoy  = date('Y-m-d');
-$ayer = date('Y-m-d', strtotime('-1 day'));
-$log  = fn(string $msg) => print("[" . date('Y-m-d H:i:s') . "] $msg\n");
+$log = function(string $msg) {
+    echo '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
+};
 
-$log("=== Inicio cron detectar_olvidos ===");
+$log('=== TimeControl CRON iniciado ===');
 
-// ── 1. Usuarios que no han fichado hoy ────────────────────────
-$sin_fichar_hoy = $db->query(
-    "SELECT u.id, u.nombre, u.apellidos, u.email, u.departamento, h.hora_inicio
-     FROM usuarios u
-     INNER JOIN horarios h ON h.id = u.id_horario
-     WHERE u.activo = 1 AND u.rol != 'admin'
-     AND TIME(NOW()) > ADDTIME(h.hora_inicio, '01:00:00')
-     AND u.id NOT IN (
-         SELECT DISTINCT id_usuario FROM fichajes WHERE DATE(timestamp) = ?
-     )",
-    [$hoy]
-);
+$fichajeModel    = new Fichaje();
+$incidenciaModel = new Incidencia();
+$mailer          = new Mailer();
 
-foreach ($sin_fichar_hoy as $emp) {
-    // Evitar duplicar incidencia del mismo día
-    $existe = $db->queryOne(
-        "SELECT id FROM incidencias WHERE id_usuario=? AND tipo='olvido_entrada' AND fecha=?",
-        [$emp['id'], $hoy]
+// ---- DETECTAR OLVIDOS DE FICHAJE DEL DÍA ANTERIOR ----
+$log('Detectando olvidos de fichaje de ayer...');
+$olvidos = $fichajeModel->getOlvidosFichajeAyer();
+
+$contOlvidos = 0;
+foreach ($olvidos as $usuario) {
+    $fecha = date('Y-m-d', strtotime('yesterday'));
+
+    // Evitar duplicar incidencias
+    $db = Database::getConnection();
+    $stmt = $db->prepare(
+        "SELECT COUNT(*) FROM incidencias WHERE id_usuario = ? AND tipo = 'olvido_fichaje' AND fecha = ?"
     );
-    if ($existe) continue;
+    $stmt->execute([$usuario['id'], $fecha]);
+    if ((int)$stmt->fetchColumn() > 0) continue;
 
-    $db->execute(
-        "INSERT INTO incidencias (id_usuario,tipo,descripcion,fecha,estado) VALUES (?,?,?,?,?)",
-        [
-            $emp['id'],
-            'olvido_entrada',
-            "El empleado no ha fichado entrada el día $hoy",
-            $hoy,
-            'pendiente'
-        ]
-    );
+    // Crear incidencia
+    $incidenciaModel->crear([
+        'id_usuario'    => $usuario['id'],
+        'tipo'          => 'olvido_fichaje',
+        'descripcion'   => "No se registró fichaje de salida el día {$fecha}.",
+        'fecha'         => $fecha,
+        'email_enviado' => 1,
+    ]);
 
-    // Email al empleado
-    EmailHelper::enviar(
-        $emp['email'],
-        $emp['nombre'] . ' ' . $emp['apellidos'],
-        'Recuerda fichar tu entrada - ' . date('d/m/Y'),
-        EmailHelper::plantillaOlvido($emp, 'entrada'),
-        $emp['id'],
-        'olvido_entrada'
-    );
-
-    $db->execute(
-        "UPDATE incidencias SET email_enviado=1 WHERE id_usuario=? AND tipo='olvido_entrada' AND fecha=?",
-        [$emp['id'], $hoy]
-    );
-
-    $log("Olvido entrada detectado: {$emp['nombre']} {$emp['apellidos']} ({$emp['email']})");
+    // Enviar email
+    $enviado = $mailer->enviarAlertaOlvido($usuario);
+    $log("Olvido detectado: {$usuario['nombre']} {$usuario['apellidos']} ({$usuario['email']}) — email " . ($enviado ? 'enviado' : 'error'));
+    $contOlvidos++;
 }
+$log("Olvidos procesados: {$contOlvidos}");
 
-// ── 2. Usuarios con entrada pero sin salida de ayer ───────────
-$sin_salida_ayer = $db->query(
-    "SELECT u.id, u.nombre, u.apellidos, u.email, u.departamento
-     FROM usuarios u
-     WHERE u.activo = 1
-     AND u.id IN (
-         -- Tienen entrada de ayer
-         SELECT DISTINCT id_usuario FROM fichajes WHERE DATE(timestamp) = ? AND tipo = 'entrada'
-     )
-     AND u.id NOT IN (
-         -- Pero no tienen salida de ayer
-         SELECT DISTINCT id_usuario FROM fichajes WHERE DATE(timestamp) = ? AND tipo = 'salida'
-     )",
-    [$ayer, $ayer]
-);
+// ---- RESUMEN DE INCIDENCIAS PENDIENTES (log) ----
+$db = Database::getConnection();
+$pendientes = (int)$db->query("SELECT COUNT(*) FROM incidencias WHERE estado = 'pendiente'")->fetchColumn();
+$log("Incidencias pendientes en el sistema: {$pendientes}");
 
-foreach ($sin_salida_ayer as $emp) {
-    $existe = $db->queryOne(
-        "SELECT id FROM incidencias WHERE id_usuario=? AND tipo='olvido_salida' AND fecha=?",
-        [$emp['id'], $ayer]
-    );
-    if ($existe) continue;
-
-    $db->execute(
-        "INSERT INTO incidencias (id_usuario,tipo,descripcion,fecha,estado) VALUES (?,?,?,?,?)",
-        [
-            $emp['id'],
-            'olvido_salida',
-            "El empleado no fichó la salida el día $ayer",
-            $ayer,
-            'pendiente'
-        ]
-    );
-
-    EmailHelper::enviar(
-        $emp['email'],
-        $emp['nombre'] . ' ' . $emp['apellidos'],
-        'Fichaje de salida no registrado - ' . date('d/m/Y', strtotime($ayer)),
-        EmailHelper::plantillaOlvido($emp, 'salida'),
-        $emp['id'],
-        'olvido_salida'
-    );
-
-    $db->execute(
-        "UPDATE incidencias SET email_enviado=1 WHERE id_usuario=? AND tipo='olvido_salida' AND fecha=?",
-        [$emp['id'], $ayer]
-    );
-
-    $log("Olvido salida detectado: {$emp['nombre']} {$emp['apellidos']}");
-}
-
-$log("=== Fin cron. Sin fichar hoy: " . count($sin_fichar_hoy) . " | Sin salida ayer: " . count($sin_salida_ayer) . " ===\n");
+$log('=== CRON finalizado ===');
+exit(0);

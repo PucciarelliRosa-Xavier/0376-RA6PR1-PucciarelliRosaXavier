@@ -1,182 +1,194 @@
 <?php
-$page_title = 'Mi Dashboard';
-$extra_js   = 'fichaje';
-require_once __DIR__ . '/../shared/header.php';
+$pageTitle = 'Mi Dashboard';
+$action = 'dashboard';
+include __DIR__ . '/../shared/header.php';
 
-$horario = $_SESSION['user_horario'] ?? [];
+// Calcular horas hoy
+$horasHoy = 0;
+if (!empty($fichajesHoy)) {
+    $entradas = array_filter($fichajesHoy, fn($f) => $f['tipo'] === 'entrada');
+    $salidas  = array_filter($fichajesHoy, fn($f) => $f['tipo'] === 'salida');
+    if (!empty($entradas) && !empty($salidas)) {
+        $primerEnt = new DateTime(end($entradas)['timestamp']);
+        $ultSal    = new DateTime(reset($salidas)['timestamp']);
+        $horasHoy  = round(abs($ultSal->getTimestamp() - $primerEnt->getTimestamp()) / 3600, 2);
+    }
+}
 ?>
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Bienvenido, <?= htmlspecialchars($usuario['nombre']) ?> 👋</h1>
+        <p class="page-subtitle"><?= date('l, d \d\e F \d\e Y') ?> — <?= htmlspecialchars($usuario['departamento_nombre'] ?? 'Sin departamento') ?></p>
+    </div>
+    <div class="page-meta">
+        <?php if ($usuario['hora_entrada']): ?>
+            <span class="meta-badge">
+                Horario: <?= substr($usuario['hora_entrada'], 0, 5) ?> – <?= substr($usuario['hora_salida'], 0, 5) ?>
+            </span>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- BOTÓN DE FICHAJE -->
+<div class="fichar-section">
+    <div class="fichar-card <?= $estadoActual === 'dentro' ? 'estado-dentro' : 'estado-fuera' ?>">
+        <div class="fichar-estado">
+            <div class="fichar-indicador" id="fichar-indicador">
+                <?= $estadoActual === 'dentro' ? '🟢' : '🔴' ?>
+            </div>
+            <div>
+                <p class="fichar-estado-texto" id="fichar-estado-texto">
+                    <?php if ($estadoActual === 'dentro'): ?>
+                        Estás <strong>dentro</strong> — fichaje de entrada registrado
+                    <?php elseif ($estadoActual === 'fuera'): ?>
+                        Estás <strong>fuera</strong> — puedes registrar tu entrada
+                    <?php else: ?>
+                        Sin fichaje hoy
+                    <?php endif; ?>
+                </p>
+                <p class="fichar-hora" id="fichar-hora-display"><?= date('H:i:s') ?></p>
+            </div>
+        </div>
+
+        <button
+            id="btn-fichar"
+            class="btn-fichar <?= $estadoActual === 'dentro' ? 'btn-salida' : 'btn-entrada' ?>"
+            data-estado="<?= $estadoActual ?>"
+        >
+            <?= $estadoActual === 'dentro' ? '↑ Registrar Salida' : '↓ Registrar Entrada' ?>
+        </button>
+    </div>
+
+    <div id="fichar-mensaje" class="fichar-alert" style="display:none;"></div>
+</div>
+
+<!-- STATS -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">⏰</div>
+        <div class="stat-value"><?= number_format($horasHoy, 1) ?>h</div>
+        <div class="stat-label">Horas hoy</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📅</div>
+        <div class="stat-value"><?= count($resumenSemana) ?></div>
+        <div class="stat-label">Días esta semana</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">🗂️</div>
+        <div class="stat-value"><?= count($proyectos) ?></div>
+        <div class="stat-label">Proyectos activos</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value"><?= number_format(array_sum(array_column($imputacionesHoy, 'horas')), 1) ?>h</div>
+        <div class="stat-label">Imputadas hoy</div>
+    </div>
+</div>
 
 <div class="dashboard-grid">
-
-    <!-- ── Fichaje Principal ── -->
-    <section class="card card--fichaje" id="fichajeCard">
-        <div class="card-body fichaje-body">
-            <div class="fichaje-status" id="fichajeStatus">
-                <div class="pulse-ring" id="pulseRing"></div>
-                <div class="status-dot" id="statusDot"></div>
-            </div>
-            <div class="fichaje-info">
-                <div class="fichaje-estado-label" id="estadoLabel">Cargando...</div>
-                <div class="fichaje-hora" id="fichajeHora">--:--</div>
-                <div class="fichaje-horas-hoy">
-                    Hoy: <strong id="horasHoy">0h 0m</strong>
-                </div>
-            </div>
-            <button class="btn-fichar" id="btnFichar" disabled>
-                <span id="btnFicharIcon">⏺</span>
-                <span id="btnFicharText">...</span>
-            </button>
-        </div>
-        <!-- Timeline del día -->
-        <div class="fichaje-timeline" id="fichajeTimeline"></div>
-    </section>
-
-    <!-- ── Horario asignado ── -->
-    <section class="card">
+    <!-- Fichajes de hoy -->
+    <div class="card">
         <div class="card-header">
-            <span class="card-icon">◷</span>
-            <h2 class="card-title">Mi horario</h2>
+            <h3 class="card-title">Fichajes de hoy</h3>
+            <a href="?action=historial" class="card-link">Ver historial →</a>
         </div>
         <div class="card-body">
-            <?php if ($horario && $horario['inicio']): ?>
-            <div class="horario-display">
-                <div class="horario-bloque">
-                    <div class="horario-label">Entrada</div>
-                    <div class="horario-hora"><?= substr($horario['inicio'], 0, 5) ?></div>
-                </div>
-                <div class="horario-sep">→</div>
-                <div class="horario-bloque">
-                    <div class="horario-label">Salida</div>
-                    <div class="horario-hora"><?= substr($horario['fin'], 0, 5) ?></div>
-                </div>
-            </div>
-            <p class="horario-nombre"><?= htmlspecialchars($horario['nombre'] ?? '') ?></p>
-            <p class="horario-tolerancia">Tolerancia: <?= (int)($horario['tolerancia'] ?? 10) ?> minutos</p>
+            <?php if (empty($fichajesHoy)): ?>
+                <p class="empty-state">No hay fichajes registrados hoy.</p>
             <?php else: ?>
-            <p class="text-muted">Sin horario asignado. Contacta con tu responsable.</p>
+                <div class="fichaje-list">
+                    <?php foreach (array_reverse($fichajesHoy) as $f): ?>
+                        <div class="fichaje-item fichaje-<?= $f['tipo'] ?>">
+                            <span class="fichaje-tipo-badge"><?= $f['tipo'] === 'entrada' ? '↓ Entrada' : '↑ Salida' ?></span>
+                            <span class="fichaje-hora"><?= substr($f['timestamp'], 11, 5) ?></span>
+                            <?php if ($f['es_tardanza']): ?>
+                                <span class="badge badge-warn">+<?= $f['minutos_diferencia'] ?>min tarde</span>
+                            <?php endif; ?>
+                            <?php if ($f['es_salida_anticipada']): ?>
+                                <span class="badge badge-warn">-<?= $f['minutos_diferencia'] ?>min anticipado</span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             <?php endif; ?>
         </div>
-    </section>
+    </div>
 
-    <!-- ── Proyectos asignados ── -->
-    <section class="card card--proyectos">
+    <!-- Proyectos asignados -->
+    <div class="card">
         <div class="card-header">
-            <span class="card-icon">◆</span>
-            <h2 class="card-title">Mis proyectos</h2>
-            <a href="<?= APP_URL ?>/index.php?action=imputaciones" class="card-action">Ver todo →</a>
+            <h3 class="card-title">Mis proyectos</h3>
+            <a href="?action=imputar" class="card-link">Imputar horas →</a>
         </div>
         <div class="card-body">
             <?php if (empty($proyectos)): ?>
-            <p class="text-muted">No tienes proyectos asignados actualmente.</p>
+                <p class="empty-state">No tienes proyectos asignados.</p>
             <?php else: ?>
-            <div class="proyecto-chips">
                 <?php foreach ($proyectos as $p): ?>
-                <div class="proyecto-chip" style="--chip-color: <?= htmlspecialchars($p['color']) ?>">
-                    <span class="chip-dot"></span>
-                    <?= htmlspecialchars($p['nombre']) ?>
-                </div>
+                    <div class="project-item">
+                        <div class="project-dot"></div>
+                        <div>
+                            <div class="project-name"><?= htmlspecialchars($p['nombre']) ?></div>
+                            <?php
+                                $hProy = 0;
+                                foreach ($resumenProyectos as $rp) {
+                                    if ($rp['proyecto_nombre'] === $p['nombre']) $hProy = $rp['total_horas'];
+                                }
+                            ?>
+                            <div class="project-hours"><?= number_format($hProy, 1) ?>h este mes</div>
+                        </div>
+                    </div>
                 <?php endforeach; ?>
-            </div>
             <?php endif; ?>
         </div>
-    </section>
+    </div>
 
-    <!-- ── Resumen semana ── -->
-    <section class="card">
+    <!-- Resumen semanal -->
+    <div class="card card-wide">
         <div class="card-header">
-            <span class="card-icon">◉</span>
-            <h2 class="card-title">Esta semana</h2>
+            <h3 class="card-title">Últimos 7 días</h3>
         </div>
         <div class="card-body">
-            <div class="semana-stat">
-                <div class="stat-num"><?= number_format($horas_semana, 1) ?>h</div>
-                <div class="stat-desc">horas imputadas</div>
-            </div>
-            <?php if (!empty($imputaciones_semana)): ?>
-            <div class="imputaciones-mini">
-                <?php
-                $by_proyecto = [];
-                foreach ($imputaciones_semana as $imp) {
-                    $key = $imp['id_proyecto'];
-                    if (!isset($by_proyecto[$key])) {
-                        $by_proyecto[$key] = ['nombre' => $imp['proyecto_nombre'], 'color' => $imp['proyecto_color'], 'horas' => 0];
-                    }
-                    $by_proyecto[$key]['horas'] += $imp['horas'];
-                }
-                foreach ($by_proyecto as $bp): ?>
-                <div class="imp-row">
-                    <span class="imp-dot" style="background:<?= htmlspecialchars($bp['color']) ?>"></span>
-                    <span class="imp-proyecto"><?= htmlspecialchars($bp['nombre']) ?></span>
-                    <span class="imp-horas"><?= number_format($bp['horas'], 1) ?>h</span>
-                </div>
-                <?php endforeach; ?>
-            </div>
-            <?php endif; ?>
-        </div>
-    </section>
-
-    <!-- ── Imputar horas rápido ── -->
-    <section class="card card--imputar">
-        <div class="card-header">
-            <span class="card-icon">+</span>
-            <h2 class="card-title">Imputar horas</h2>
-        </div>
-        <div class="card-body">
-            <?php if (empty($proyectos)): ?>
-            <p class="text-muted">Necesitas proyectos asignados para imputar horas.</p>
+            <?php if (empty($resumenSemana)): ?>
+                <p class="empty-state">Sin datos de la semana.</p>
             <?php else: ?>
-            <form id="imputarRapidoForm" class="form-compact">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Proyecto</label>
-                        <select name="id_proyecto" class="form-input" required>
-                            <option value="">Seleccionar...</option>
-                            <?php foreach ($proyectos as $p): ?>
-                            <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nombre']) ?></option>
+                <div class="week-table">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Entrada</th>
+                                <th>Salida</th>
+                                <th>Horas</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($resumenSemana as $dia): ?>
+                                <tr>
+                                    <td><?= date('d/m/Y', strtotime($dia['fecha'])) ?></td>
+                                    <td class="mono"><?= $dia['primera_entrada'] ? substr($dia['primera_entrada'], 11, 5) : '—' ?></td>
+                                    <td class="mono"><?= $dia['ultima_salida'] ? substr($dia['ultima_salida'], 11, 5) : '—' ?></td>
+                                    <td class="mono bold"><?= $dia['horas_trabajadas'] !== null ? number_format($dia['horas_trabajadas'], 1) . 'h' : '—' ?></td>
+                                    <td>
+                                        <?php if ($dia['hubo_tardanza']): ?>
+                                            <span class="badge badge-warn">Tardanza</span>
+                                        <?php elseif ($dia['horas_trabajadas'] !== null): ?>
+                                            <span class="badge badge-ok">OK</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-neutral">Sin salida</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
                             <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group form-group--sm">
-                        <label class="form-label">Horas</label>
-                        <input type="number" name="horas" class="form-input" min="0.5" max="12" step="0.5" placeholder="2.0" required>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Fecha</label>
-                    <input type="date" name="fecha" class="form-input" value="<?= date('Y-m-d') ?>" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Descripción (opcional)</label>
-                    <input type="text" name="descripcion" class="form-input" placeholder="¿En qué has trabajado?">
-                </div>
-                <button type="submit" class="btn btn-primary">Guardar imputación</button>
-            </form>
             <?php endif; ?>
         </div>
-    </section>
+    </div>
+</div>
 
-    <!-- ── Incidencias ── -->
-    <?php if (!empty($incidencias)): ?>
-    <section class="card card--incidencias">
-        <div class="card-header">
-            <span class="card-icon">⚠</span>
-            <h2 class="card-title">Incidencias pendientes</h2>
-        </div>
-        <div class="card-body">
-            <?php foreach ($incidencias as $inc): ?>
-            <div class="incidencia-row incidencia-<?= $inc['tipo'] ?>">
-                <div class="inc-tipo"><?= str_replace('_', ' ', ucfirst($inc['tipo'])) ?></div>
-                <div class="inc-desc"><?= htmlspecialchars($inc['descripcion']) ?></div>
-                <div class="inc-fecha"><?= date('d/m/Y', strtotime($inc['fecha'])) ?></div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </section>
-    <?php endif; ?>
-
-</div><!-- /dashboard-grid -->
-
-<?php
-$inline_js = "const APP_URL = '" . APP_URL . "';";
-require_once __DIR__ . '/../shared/footer.php';
-?>
+<?php include __DIR__ . '/../shared/footer.php'; ?>
