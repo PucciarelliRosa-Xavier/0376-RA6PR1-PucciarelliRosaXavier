@@ -36,8 +36,8 @@ class ImputacionController {
         if ($horas <= 0 || $horas > 24) $errores[] = 'Les hores han de ser entre 0.5 i 24.';
         if (empty($descripcion)) $errores[] = 'La descripció és obligatòria.';
         if ($fecha > date('Y-m-d')) $errores[] = 'No es poden imputar hores en una data futura.';
-
-        if (empty($errores)) {
+        $horasDelDia = $this->imputacionModel->getTotalHorasDelDia($idUsuario, $fecha);
+        if (($horasDelDia + $horas) > 8) $errores[] = 'No es poden imputar més de 8 hores en un mateix dia. Ja tens ' . $horasDelDia . 'h imputades aquest dia.';        if (empty($errores)) {
             $this->imputacionModel->crear([
                 'id_usuario' => $idUsuario, 'id_proyecto' => $idProyecto,
                 'horas' => $horas, 'fecha' => $fecha, 'descripcion' => $descripcion,
