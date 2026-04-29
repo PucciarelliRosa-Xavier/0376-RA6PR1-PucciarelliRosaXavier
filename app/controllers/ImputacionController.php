@@ -31,10 +31,11 @@ class ImputacionController {
         $fecha      = $_POST['fecha'] ?? date('Y-m-d');
         $descripcion = trim($_POST['descripcion'] ?? '');
 
-        $errores = [];
-        if ($idProyecto <= 0) $errores[] = 'Selecciona un proyecto válido.';
-        if ($horas <= 0 || $horas > 24) $errores[] = 'Las horas deben ser entre 0.5 y 24.';
-        if (empty($descripcion)) $errores[] = 'La descripción es obligatoria.';
+       $errores = [];
+        if ($idProyecto <= 0) $errores[] = 'Selecciona un projecte vàlid.';
+        if ($horas <= 0 || $horas > 24) $errores[] = 'Les hores han de ser entre 0.5 i 24.';
+        if (empty($descripcion)) $errores[] = 'La descripció és obligatòria.';
+        if ($fecha > date('Y-m-d')) $errores[] = 'No es poden imputar hores en una data futura.';
 
         if (empty($errores)) {
             $this->imputacionModel->crear([
