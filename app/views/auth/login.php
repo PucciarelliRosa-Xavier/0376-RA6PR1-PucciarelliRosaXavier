@@ -50,7 +50,7 @@
                     class="form-input"
                     placeholder="••••••••"
                     required
-                    autocomplete="current-password"
+                    autocomplete="off"
                 >
             </div>
 
