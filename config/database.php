@@ -5,8 +5,8 @@
 
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'timecontrol');
-define('DB_USER', 'timecontrol_user');       // Cambiar en producción
-define('DB_PASS', 'TuPasswordSegura123!');           // Cambiar en producción
+define('DB_USER', 'timecontrol_user');       
+define('DB_PASS', 'TuPasswordSegura123!');           
 define('DB_CHARSET', 'utf8mb4');
 
 // Configuración de la aplicación
